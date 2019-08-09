@@ -14,6 +14,17 @@
 #define SWAY_SCROLL_LEFT KEY_MAX + 3
 #define SWAY_SCROLL_RIGHT KEY_MAX + 4
 
+/**
+represents a single touch point to be stored by sway_cursor 
+for processing multitouch gestures
+ */
+struct sway_touch_point {
+  struct wl_list link;
+  int32_t touch_id;
+  double x;
+  double y;
+};
+
 struct sway_cursor {
 	struct sway_seat *seat;
 	struct wlr_cursor *cursor;
@@ -50,6 +61,8 @@ struct sway_cursor {
 	struct wl_listener touch_down;
 	struct wl_listener touch_up;
 	struct wl_listener touch_motion;
+  //touch points
+  struct wl_list touch_points;
 
 	struct wl_listener tool_axis;
 	struct wl_listener tool_tip;

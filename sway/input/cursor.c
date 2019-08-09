@@ -358,6 +358,19 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 	seat->touch_x = lx;
 	seat->touch_y = ly;
 
+	//store the new touch point into the list and check if cursor is the right place to store it
+	struct sway_touch_point *touch_point = calloc(1, sizeof(struct sway_touch_point));
+	touch_point->x=0;
+	touch_point->x = lx;
+	touch_point->y = ly;
+	touch_point->touch_id = event->touch_id;
+	wl_list_insert(&cursor->touch_points, &touch_point->link);
+
+	printf("touch point with id %d added\n",
+		touch_point->touch_id);
+	printf("total number of stored touch points: %d\n",
+		wl_list_length(&cursor->touch_points));
+	
 	if (!surface) {
 		return;
 	}
@@ -375,6 +388,21 @@ static void handle_touch_up(struct wl_listener *listener, void *data) {
 	seat_idle_notify_activity(cursor->seat, IDLE_SOURCE_TOUCH);
 	struct wlr_event_touch_up *event = data;
 	struct wlr_seat *seat = cursor->seat->wlr_seat;
+
+	//find the touch point with this id, remove it
+	//and tell the resulting number of points
+
+	struct sway_touch_point *point, *tmp;
+	wl_list_for_each_safe(point, tmp, &cursor->touch_points, link) {
+	  if (event->touch_id == point->touch_id) {
+	    wl_list_remove(&point->link);
+	  }
+	}
+	printf("touch point with id %d removed\n",
+		 event->touch_id);
+	printf("total number of points: %d\n",
+		 wl_list_length(&cursor->touch_points));
+	
 	// TODO: fall back to cursor simulation if client has not bound to touch
 	wlr_seat_touch_notify_up(seat, event->time_msec, event->touch_id);
 }
@@ -395,6 +423,8 @@ static void handle_touch_motion(struct wl_listener *listener, void *data) {
 	double sx, sy;
 	node_at_coords(cursor->seat, lx, ly, &surface, &sx, &sy);
 
+	
+	
 	if (seat->touch_id == event->touch_id) {
 		seat->touch_x = lx;
 		seat->touch_y = ly;
@@ -857,7 +887,7 @@ void sway_cursor_destroy(struct sway_cursor *cursor) {
 	if (!cursor) {
 		return;
 	}
-
+	
 	wl_event_source_remove(cursor->hide_source);
 
 	wl_list_remove(&cursor->image_surface_destroy.link);
@@ -896,6 +926,9 @@ struct sway_cursor *sway_cursor_create(struct sway_seat *seat) {
 		free(cursor);
 		return NULL;
 	}
+
+	//initializing the touch points list
+	wl_list_init(&cursor->touch_points);
 
 	cursor->previous.x = wlr_cursor->x;
 	cursor->previous.y = wlr_cursor->y;
