@@ -20,7 +20,7 @@ void set_touch_motion_hysteresis(struct sway_touch_gesture *gesture,
 }
 
 //initializing the touch points list
-struct sway_touch_gesture* init_touch_gesture() {
+struct sway_touch_gesture* touch_gesture_create() {
 
   struct sway_touch_gesture *gesture = calloc(1, sizeof(struct sway_touch_gesture));
   wl_list_init(&gesture->touch_points);
@@ -129,4 +129,11 @@ bool process_touch_motion(struct sway_touch_gesture *gesture,
 	  return false;
 	} 
 	return true;
+}
+
+void touch_gesture_destroy(struct sway_touch_gesture *gesture) {
+
+  gesture->initial_surface = NULL;
+  wl_list_remove(&gesture->touch_points);
+  free(gesture);
 }

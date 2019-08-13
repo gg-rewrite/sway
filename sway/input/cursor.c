@@ -1024,6 +1024,8 @@ void sway_cursor_destroy(struct sway_cursor *cursor) {
 	if (!cursor) {
 		return;
 	}
+
+	
 	
 	wl_event_source_remove(cursor->hide_source);
 
@@ -1064,7 +1066,7 @@ struct sway_cursor *sway_cursor_create(struct sway_seat *seat) {
 		return NULL;
 	}
 
-	cursor->touch_gesture = init_touch_gesture();
+	cursor->touch_gesture = touch_gesture_create();
 	  
 	cursor->previous.x = wlr_cursor->x;
 	cursor->previous.y = wlr_cursor->y;
