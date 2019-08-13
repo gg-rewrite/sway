@@ -57,7 +57,8 @@ void set_touch_motion_hysteresis(struct sway_touch_gesture *gesture,
 			   int32_t phys_size,
 			   int32_t px_size);
 
-struct sway_touch_gesture* init_touch_gesture();
+struct sway_touch_gesture* touch_gesture_create();
+void touch_gesture_destroy(struct sway_touch_gesture *gesture);
 
 /**returns true if allowed to proceed with touch passthrough,
 false otherwise
