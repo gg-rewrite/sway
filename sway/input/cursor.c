@@ -20,6 +20,7 @@
 #include "sway/desktop.h"
 #include "sway/desktop/transaction.h"
 #include "sway/input/cursor.h"
+#include "sway/input/touch_gestures.h"
 #include "sway/input/keyboard.h"
 #include "sway/input/tablet.h"
 #include "sway/layers.h"
@@ -358,29 +359,11 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 	seat->touch_x = lx;
 	seat->touch_y = ly;
 
-	struct sway_touch_point *touch_point = calloc(1, sizeof(struct sway_touch_point));
-	touch_point->x = lx;
-	touch_point->y = ly;
-	touch_point->touch_id = event->touch_id;
-	touch_point->time = event->time_msec;
-	if (cursor->touch_gestures.maximum_touch_points == 0) {
-	  cursor->touch_gestures.initial_surface = surface;
-	  cursor->touch_gestures.initial_touch_id = event->touch_id;
-       	} 
-	wl_list_insert(&cursor->touch_gestures.touch_points, &touch_point->link);
-
-	uint32_t npoints = wl_list_length(&cursor->touch_gestures.touch_points);
-
-	if (npoints > cursor->touch_gestures.maximum_touch_points) {
-	  cursor->touch_gestures.maximum_touch_points = npoints;
-	}
-
-	if (npoints >= 3) {
-	  //cancelling touch down event if three or more fingers are down
-	  // (to e.g. prevent further scrolling while inputting a motion gesture)
+	if (!process_touch_down(cursor->touch_gesture, event->touch_id,
+				lx, ly, event->time_msec, surface)) {
 	  wlr_seat_touch_notify_up(wlr_seat, event->time_msec, event->touch_id);
 	  return;
-	}
+	  }
 	
 	if (!surface) {
 		return;
@@ -400,56 +383,10 @@ static void handle_touch_up(struct wl_listener *listener, void *data) {
 	struct wlr_event_touch_up *event = data;
 	struct wlr_seat *seat = cursor->seat->wlr_seat;
 
-	//find the touch point with this id, remove it
-	//and tell the resulting number of points
-
-	struct sway_touch_point *point, *tmp;
-	wl_list_for_each_safe(point, tmp, &cursor->touch_gestures.touch_points, link) {
-	  if (event->touch_id == point->touch_id) {
-	    if (event->touch_id == cursor->touch_gestures.initial_touch_id
-		&& cursor->touch_gestures.gesture_state == TAP
-		&& (event->time_msec -  point->time) > LONG_TAP_MS) {
-	      cursor->touch_gestures.gesture_state = LONG_TAP;
-	    }
-	    wl_list_remove(&point->link);
-	    break;
-	  }
-	}
-
-	uint32_t npoints = wl_list_length(&cursor->touch_gestures.touch_points);
-	if (npoints == 0) {
-	  printf("Points for this gesture: %d\n",
-		 cursor->touch_gestures.maximum_touch_points);
-	  //printf("is motion gesture: %s\n",
-	  //	 (cursor->touch_gestures.motion_gesture) ? "yes" : "no");
-	  printf("resulting gesture: ");
-	  switch(cursor->touch_gestures.gesture_state) {
-	  case TAP: printf("Tap"); break;
-	  case LONG_TAP: printf("Long Tap"); break;
-	  case MOTION_UP: printf("Swipe Up"); break;
-	  case MOTION_DOWN: printf("Swipe Down"); break;
-	  case MOTION_LEFT: printf("Swipe Left"); break;
-	  case MOTION_RIGHT: printf("Swipe right"); break;
-	  case PINCH_IN: printf("Pinch In"); break;
-	  case PINCH_OUT: printf("Pinch Out"); break;
-	  default: break;
-	  }
-	  printf("\n");
-	  printf("all touch points freed, starting gesture processing\n");
-	  //TODO gesture processing goes here
-	  cursor->touch_gestures.maximum_touch_points = 0;
-	  cursor->touch_gestures.initial_surface = NULL;
-	  cursor->touch_gestures.motion_gesture = false;
-	  cursor->touch_gestures.gesture_state = TAP;
-	}
+	process_touch_up(cursor->touch_gesture, event->touch_id, event->time_msec);
 	
 	// TODO: fall back to cursor simulation if client has not bound to touch
 	wlr_seat_touch_notify_up(seat, event->time_msec, event->touch_id);
-}
-
-double measure_distance(double x1, double x2, double y1, double y2) {
-  return sqrt((x1 - x2) * (x1 - x2) +
-	      (y1 - y2) * (y1 - y2));
 }
 
 static void handle_touch_motion(struct wl_listener *listener, void *data) {
@@ -469,29 +406,14 @@ static void handle_touch_motion(struct wl_listener *listener, void *data) {
 	node_at_coords(cursor->seat, lx, ly, &surface, &sx, &sy);
 
 	//TODO check if can be done in cursor_create
-	if (cursor->touch_gestures.motion_hysteresis == 0) {
+	if (is_touch_motion_hysteresis_unset(cursor->touch_gesture)) {
 	  struct wlr_output *output =
 	    wlr_output_layout_output_at(root->output_layout, lx, ly);
 	  //roughly 1cm
-	  cursor->touch_gestures.motion_hysteresis = output->width / output->phys_width * 10;
-	}
-	
-	struct sway_touch_point *point;
-	wl_list_for_each(point, &cursor->touch_gestures.touch_points, link) {
-	  if (point->touch_id == event->touch_id) {
-	    point->dx = lx;
-	    point->dy = ly;
-	    if (measure_distance(point->x, point->dx, point->y, point->dy)
-		>= cursor->touch_gestures.motion_hysteresis) {
-	      cursor->touch_gestures.motion_gesture = true;
-	      
-	    }
-	    break;
+	  set_touch_motion_hysteresis(cursor->touch_gesture, output->phys_width,
+				      output->width);
 	  }
-	}
-
-	//not sending touch motion if three or more fingers present
-	if (wl_list_length(&cursor->touch_gestures.touch_points) >= 3) {
+	if (!process_touch_motion(cursor->touch_gesture, lx, ly, event->touch_id)) {
 	  return;
 	}
 	
@@ -997,13 +919,8 @@ struct sway_cursor *sway_cursor_create(struct sway_seat *seat) {
 		return NULL;
 	}
 
-	//initializing the touch points list
-	wl_list_init(&cursor->touch_gestures.touch_points);
-	cursor->touch_gestures.initial_surface = NULL;
-	cursor->touch_gestures.maximum_touch_points = 0;
-	cursor->touch_gestures.motion_hysteresis = 0;
-	cursor->touch_gestures.gesture_state = TAP;
-	
+	cursor->touch_gesture = init_touch_gesture();
+	  
 	cursor->previous.x = wlr_cursor->x;
 	cursor->previous.y = wlr_cursor->y;
 

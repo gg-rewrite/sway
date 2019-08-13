@@ -14,35 +14,6 @@
 #define SWAY_SCROLL_LEFT KEY_MAX + 3
 #define SWAY_SCROLL_RIGHT KEY_MAX + 4
 
-#define LONG_TAP_MS 500
-
-enum touch_gesture_states {
- TAP,
- LONG_TAP,
- MOTION_UP,
- MOTION_DOWN,
- MOTION_LEFT,
- MOTION_RIGHT,
- PINCH_IN,
- PINCH_OUT,
-		     
-};
-
-/**
-represents a single touch point to be stored by sway_cursor 
-for processing multitouch gestures
- */
-struct sway_touch_point {
-  struct wl_list link;
-  int32_t touch_id;
-  double x;
-  double y;
-  uint32_t time;
-  double dx;
-  double dy;
-  double initial_distance;
-  double current_distance;
-};
 
 struct sway_cursor {
 	struct sway_seat *seat;
@@ -80,17 +51,7 @@ struct sway_cursor {
 	struct wl_listener touch_down;
 	struct wl_listener touch_up;
 	struct wl_listener touch_motion;
-  //touch information
-  struct {
-    struct wl_list touch_points;
-    struct wlr_surface *initial_surface;
-    int32_t initial_touch_id;
-    bool motion_gesture;
-    uint32_t maximum_touch_points;
-    double motion_hysteresis;
-    enum touch_gesture_states gesture_state;
-  } touch_gestures;
-
+  struct sway_touch_gesture *touch_gesture;
 
 	struct wl_listener tool_axis;
 	struct wl_listener tool_tip;
