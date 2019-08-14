@@ -1,9 +1,19 @@
 #include <math.h>
 #include "sway/input/touch_gestures.h"
-#include "sway/input/cursor.h"
 
 double measure_distance(double x1, double x2, double y1, double y2) {
-	return sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+	return sqrt(pow((x1 - x2), 2) + pow((y1 - y2), 2));
+}
+
+struct sway_touch_point *get_point_by_id(struct sway_touch_gesture *gesture,
+		int32_t id) {
+	struct sway_touch_point *point;
+	wl_list_for_each(point, &gesture->touch_points, link) {
+		if (point->touch_id == id) {
+			break;
+		}
+	}
+	return point;
 }
 
 bool is_touch_motion_hysteresis_unset(struct sway_touch_gesture *gesture) {
@@ -15,8 +25,8 @@ bool is_touch_motion_hysteresis_unset(struct sway_touch_gesture *gesture) {
 
 void set_touch_motion_hysteresis(struct sway_touch_gesture *gesture,
 		int32_t phys_size,
-		int32_t ps_size) {
-	gesture->motion_hysteresis = phys_size / ps_size * 10;
+		int32_t px_size) {
+	gesture->motion_hysteresis = px_size / phys_size * HYSTERESIS_MM;
 }
 
 //initializing the touch points list
@@ -25,7 +35,6 @@ struct sway_touch_gesture *touch_gesture_create() {
 	struct sway_touch_gesture *gesture =
 			calloc(1, sizeof(struct sway_touch_gesture));
 	wl_list_init(&gesture->touch_points);
-	gesture->initial_surface = NULL;
 	gesture->maximum_touch_points = 0;
 	gesture->motion_hysteresis = 0;
 	gesture->gesture_state = TAP;
@@ -44,14 +53,25 @@ bool process_touch_down(struct sway_touch_gesture *gesture,
 	touch_point->y = layout_y;
 	touch_point->touch_id = touch_id;
 	touch_point->time = time_msec;
+
 	if (gesture->maximum_touch_points == 0) {
-		gesture->initial_surface = surface;
 		gesture->initial_touch_id = touch_id;
+		touch_point->initial_distance = 0;
+	} else if (gesture->maximum_touch_points == 1) {
+		//TODO make a less dumb way of just taking a point next to initial one
+		gesture->next_touch_id = touch_id;
+	} else {
+		struct sway_touch_point *initial_point =
+				get_point_by_id(gesture, gesture->initial_touch_id);
+		touch_point->initial_distance = measure_distance(touch_point->x,
+				initial_point->x,
+				touch_point->y,
+				initial_point->y);
 	}
+
 	wl_list_insert(&gesture->touch_points, &touch_point->link);
 
 	uint32_t npoints = wl_list_length(&gesture->touch_points);
-
 	if (npoints > gesture->maximum_touch_points) {
 		gesture->maximum_touch_points = npoints;
 	}
@@ -85,10 +105,8 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 
 	uint32_t npoints = wl_list_length(&gesture->touch_points);
 	if (npoints == 0) {
-		printf("Points for this gesture: %d\n", gesture->maximum_touch_points);
-		//printf("is motion gesture: %s\n",
-		//	 (cursor->touch_gestures.motion_gesture) ? "yes" : "no");
 		printf("resulting gesture: ");
+		printf("%d finger ", gesture->maximum_touch_points);
 		switch (gesture->gesture_state) {
 		case TAP:
 			printf("Tap");
@@ -106,7 +124,7 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 			printf("Swipe Left");
 			break;
 		case MOTION_RIGHT:
-			printf("Swipe right");
+			printf("Swipe Right");
 			break;
 		case PINCH_IN:
 			printf("Pinch In");
@@ -121,8 +139,6 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 		printf("all touch points freed, starting gesture processing\n");
 		//TODO gesture processing goes here
 		gesture->maximum_touch_points = 0;
-		gesture->initial_surface = NULL;
-		gesture->motion_gesture = false;
 		gesture->gesture_state = TAP;
 	}
 }
@@ -132,6 +148,10 @@ bool process_touch_motion(struct sway_touch_gesture *gesture,
 		double layout_y,
 		int32_t touch_id) {
 
+	//not sending touch events if three or more fingers touching
+	bool touch_passthrough =
+			(wl_list_length(&gesture->touch_points) >= 3) ? true : false;
+
 	struct sway_touch_point *point;
 	wl_list_for_each(point, &gesture->touch_points, link) {
 		if (point->touch_id == touch_id) {
@@ -139,43 +159,72 @@ bool process_touch_motion(struct sway_touch_gesture *gesture,
 		}
 	}
 
+	point->dx = layout_x;
+	point->dy = layout_y;
+
 	if (measure_distance(point->x, layout_x, point->y, layout_y) >=
 			gesture->motion_hysteresis) {
-		gesture->motion_gesture = true;
+
+		//swipe detection
 		double dir_x = layout_x - point->x;
 		double dir_y = layout_y - point->y;
 		double dx = fabs(dir_x);
 		double dy = fabs(dir_y);
+		printf("current motion type: swipe ");
 		if (dx > dy) {
-		  //horizontal motion
-		  if (dir_x < 0) {
-		    //left
-		    gesture->gesture_state = MOTION_LEFT;
-		  } else {
-		    gesture->gesture_state = MOTION_RIGHT;
-		  }
+			//horizontal motion
+			if (dir_x < 0) {
+				//left
+				printf("left");
+				gesture->gesture_state = MOTION_LEFT;
+			} else {
+				printf("right");
+				gesture->gesture_state = MOTION_RIGHT;
+			}
 		} else {
-		  //vertical motion
-		  if (dir_y < 0) {
-		    //up
-		    gesture->gesture_state = MOTION_UP;
-		  } else {
-		    //down
-		    gesture->gesture_state = MOTION_DOWN;
-		  }
+			//vertical motion
+			if (dir_y < 0) {
+				//up
+				printf("up");
+				gesture->gesture_state = MOTION_UP;
+			} else {
+				//down
+				printf("down");
+				gesture->gesture_state = MOTION_DOWN;
+			}
+		}
+		printf("\n");
+
+		if (wl_list_length(&gesture->touch_points) >= 2) {
+			struct sway_touch_point *initial_point =
+					get_point_by_id(gesture, gesture->initial_touch_id);
+			struct sway_touch_point *next_point =
+					get_point_by_id(gesture, gesture->next_touch_id);
+
+			double initial_d = measure_distance(initial_point->x,
+					next_point->x,
+					initial_point->y,
+					next_point->y); // sounds of eurobeat in the distance
+			double current_d = measure_distance(initial_point->dx,
+					next_point->dx,
+					initial_point->dy,
+					next_point->dy);
+
+			if (fabs(current_d - initial_d) > gesture->motion_hysteresis) {
+				if (current_d > initial_d) {
+					gesture->gesture_state = PINCH_OUT;
+				} else {
+					gesture->gesture_state = PINCH_IN;
+				}
+			}
 		}
 	}
 
-	//not sending touch motion if three or more fingers present
-	if (wl_list_length(&gesture->touch_points) >= 3) {
-		return false;
-	}
-	return true;
+	return touch_passthrough;
 }
 
 void touch_gesture_destroy(struct sway_touch_gesture *gesture) {
 
-	gesture->initial_surface = NULL;
 	wl_list_remove(&gesture->touch_points);
 	free(gesture);
 }
