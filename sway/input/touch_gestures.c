@@ -1,4 +1,5 @@
 #include <math.h>
+#include "sway/config.h"
 #include "sway/input/touch_gestures.h"
 
 double measure_distance(double x1, double x2, double y1, double y2) {
@@ -30,10 +31,11 @@ void set_touch_motion_hysteresis(struct sway_touch_gesture *gesture,
 }
 
 //initializing the touch points list
-struct sway_touch_gesture *touch_gesture_create() {
+struct sway_touch_gesture *touch_gesture_create(struct sway_seat *seat) {
 
 	struct sway_touch_gesture *gesture =
 			calloc(1, sizeof(struct sway_touch_gesture));
+	gesture->seat = seat;
 	wl_list_init(&gesture->touch_points);
 	gesture->maximum_touch_points = 0;
 	gesture->motion_hysteresis = 0;
@@ -94,7 +96,7 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 	wl_list_for_each_safe(point, tmp, &gesture->touch_points, link) {
 		if (touch_id == point->touch_id) {
 			if (touch_id == gesture->initial_touch_id &&
-			    gesture->gesture_state == GESTURE_TAP &&
+					gesture->gesture_state == GESTURE_TAP &&
 					(time_msec - point->time) > LONG_TAP_MS) {
 				gesture->gesture_state = GESTURE_LONG_TAP;
 			}
@@ -103,42 +105,62 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 		}
 	}
 
+	struct sway_binding *binding = calloc(1, sizeof(struct sway_binding));
+	binding->type = BINDING_TOUCH;
+	bool is_assigned_cmd = false;
+
 	uint32_t npoints = wl_list_length(&gesture->touch_points);
 	if (npoints == 0) {
-		printf("resulting gesture: ");
-		printf("%d finger ", gesture->maximum_touch_points);
 		switch (gesture->gesture_state) {
 		case GESTURE_TAP:
-			printf("Tap");
 			break;
 		case GESTURE_LONG_TAP:
-			printf("Long Tap");
+			switch (gesture->maximum_touch_points) {
+			case 3:
+				binding->command = "exec termite";
+				is_assigned_cmd = true;
+				break;
+			case 4:
+				break;
+			case 5:
+				break;
+			default:
+				break;
+			}
 			break;
 		case GESTURE_SWIPE_UP:
-			printf("Swipe Up");
 			break;
 		case GESTURE_SWIPE_DOWN:
-			printf("Swipe Down");
+			switch (gesture->maximum_touch_points) {
+			case 3:
+				break;
+			case 4:
+			  binding->command = "kill";
+			  is_assigned_cmd = true;
+				break;
+			case 5:
+				break;
+			default:
+				break;
+			}
+
 			break;
 		case GESTURE_SWIPE_LEFT:
-			printf("Swipe Left");
 			break;
 		case GESTURE_SWIPE_RIGHT:
-			printf("Swipe Right");
 			break;
 		case GESTURE_PINCH_IN:
-			printf("Pinch In");
 			break;
 		case GESTURE_PINCH_OUT:
-			printf("Pinch Out");
 			break;
 		default:
 			break;
 		}
-		printf("\n");
-		printf("all touch points freed, starting gesture processing\n");
 		//TODO gesture processing goes here
-		
+		if (is_assigned_cmd) {
+			seat_execute_command(gesture->seat, binding);
+		}
+		free(binding);
 		gesture->maximum_touch_points = 0;
 		gesture->gesture_state = GESTURE_TAP;
 	}
