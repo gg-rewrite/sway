@@ -37,7 +37,7 @@ struct sway_touch_gesture *touch_gesture_create() {
 	wl_list_init(&gesture->touch_points);
 	gesture->maximum_touch_points = 0;
 	gesture->motion_hysteresis = 0;
-	gesture->gesture_state = TAP;
+	gesture->gesture_state = GESTURE_TAP;
 	return gesture;
 }
 
@@ -94,9 +94,9 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 	wl_list_for_each_safe(point, tmp, &gesture->touch_points, link) {
 		if (touch_id == point->touch_id) {
 			if (touch_id == gesture->initial_touch_id &&
-					gesture->gesture_state == TAP &&
+			    gesture->gesture_state == GESTURE_TAP &&
 					(time_msec - point->time) > LONG_TAP_MS) {
-				gesture->gesture_state = LONG_TAP;
+				gesture->gesture_state = GESTURE_LONG_TAP;
 			}
 			wl_list_remove(&point->link);
 			break;
@@ -108,28 +108,28 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 		printf("resulting gesture: ");
 		printf("%d finger ", gesture->maximum_touch_points);
 		switch (gesture->gesture_state) {
-		case TAP:
+		case GESTURE_TAP:
 			printf("Tap");
 			break;
-		case LONG_TAP:
+		case GESTURE_LONG_TAP:
 			printf("Long Tap");
 			break;
-		case MOTION_UP:
+		case GESTURE_SWIPE_UP:
 			printf("Swipe Up");
 			break;
-		case MOTION_DOWN:
+		case GESTURE_SWIPE_DOWN:
 			printf("Swipe Down");
 			break;
-		case MOTION_LEFT:
+		case GESTURE_SWIPE_LEFT:
 			printf("Swipe Left");
 			break;
-		case MOTION_RIGHT:
+		case GESTURE_SWIPE_RIGHT:
 			printf("Swipe Right");
 			break;
-		case PINCH_IN:
+		case GESTURE_PINCH_IN:
 			printf("Pinch In");
 			break;
-		case PINCH_OUT:
+		case GESTURE_PINCH_OUT:
 			printf("Pinch Out");
 			break;
 		default:
@@ -138,8 +138,9 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 		printf("\n");
 		printf("all touch points freed, starting gesture processing\n");
 		//TODO gesture processing goes here
+		
 		gesture->maximum_touch_points = 0;
-		gesture->gesture_state = TAP;
+		gesture->gesture_state = GESTURE_TAP;
 	}
 }
 
@@ -170,30 +171,24 @@ bool process_touch_motion(struct sway_touch_gesture *gesture,
 		double dir_y = layout_y - point->y;
 		double dx = fabs(dir_x);
 		double dy = fabs(dir_y);
-		printf("current motion type: swipe ");
 		if (dx > dy) {
 			//horizontal motion
 			if (dir_x < 0) {
 				//left
-				printf("left");
-				gesture->gesture_state = MOTION_LEFT;
+				gesture->gesture_state = GESTURE_SWIPE_LEFT;
 			} else {
-				printf("right");
-				gesture->gesture_state = MOTION_RIGHT;
+				gesture->gesture_state = GESTURE_SWIPE_RIGHT;
 			}
 		} else {
 			//vertical motion
 			if (dir_y < 0) {
 				//up
-				printf("up");
-				gesture->gesture_state = MOTION_UP;
+				gesture->gesture_state = GESTURE_SWIPE_UP;
 			} else {
 				//down
-				printf("down");
-				gesture->gesture_state = MOTION_DOWN;
+				gesture->gesture_state = GESTURE_SWIPE_DOWN;
 			}
 		}
-		printf("\n");
 
 		if (wl_list_length(&gesture->touch_points) >= 2) {
 			struct sway_touch_point *initial_point =
@@ -212,9 +207,9 @@ bool process_touch_motion(struct sway_touch_gesture *gesture,
 
 			if (fabs(current_d - initial_d) > gesture->motion_hysteresis) {
 				if (current_d > initial_d) {
-					gesture->gesture_state = PINCH_OUT;
+					gesture->gesture_state = GESTURE_PINCH_OUT;
 				} else {
-					gesture->gesture_state = PINCH_IN;
+					gesture->gesture_state = GESTURE_PINCH_IN;
 				}
 			}
 		}

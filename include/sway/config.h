@@ -29,7 +29,8 @@ enum binding_input_type {
 	BINDING_KEYSYM,
 	BINDING_MOUSECODE,
 	BINDING_MOUSESYM,
-	BINDING_SWITCH
+	BINDING_SWITCH,
+	BINDING_TOUCH,
 };
 
 enum binding_flags {
@@ -74,6 +75,32 @@ struct sway_switch_binding {
 	enum wlr_switch_state state;
 	uint32_t flags;
 	char *command;
+};
+
+/** 
+ * a list of gesture types/states
+ *
+ */
+enum touch_gesture_types {
+	GESTURE_TAP,
+	GESTURE_LONG_TAP,
+	GESTURE_SWIPE_UP,
+	GESTURE_SWIPE_DOWN,
+	GESTURE_SWIPE_LEFT,
+	GESTURE_SWIPE_RIGHT,
+	GESTURE_PINCH_IN,
+	GESTURE_PINCH_OUT,
+
+};
+
+
+/**
+ * A touch binding
+ */
+struct sway_touch_binding {
+  uint32_t npoints;
+  enum touch_gesture_types type;
+  char *command;
 };
 
 /**
