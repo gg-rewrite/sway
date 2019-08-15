@@ -1076,7 +1076,7 @@ struct sway_cursor *sway_cursor_create(struct sway_seat *seat) {
 		return NULL;
 	}
 
-	cursor->touch_gesture = touch_gesture_create();
+	cursor->touch_gesture = touch_gesture_create(seat);
 	  
 	cursor->previous.x = wlr_cursor->x;
 	cursor->previous.y = wlr_cursor->y;

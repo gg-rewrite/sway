@@ -8,7 +8,6 @@
 #define HYSTERESIS_MM 20
 #define LONG_TAP_MS 500
 
-
 /**
  * represents a single touch point to be stored by sway_cursor 
  * for processing multitouch gestures
@@ -30,6 +29,7 @@ struct sway_touch_point {
  * calculated motion hysteresis based on the assigned output's DPM
  */
 struct sway_touch_gesture {
+	struct sway_seat *seat;
 	struct wl_list touch_points;
 	int32_t initial_touch_id;
 	int32_t next_touch_id;
@@ -54,7 +54,7 @@ void set_touch_motion_hysteresis(struct sway_touch_gesture *gesture,
 /**
  * creates and initializes a single gesture
  */
-struct sway_touch_gesture *touch_gesture_create();
+struct sway_touch_gesture *touch_gesture_create(struct sway_seat *seat);
 
 /**
  * destroys the gesture 
