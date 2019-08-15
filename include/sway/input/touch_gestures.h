@@ -8,21 +8,6 @@
 #define HYSTERESIS_MM 20
 #define LONG_TAP_MS 500
 
-/** 
- * a list of gesture types/states
- *
- */
-enum touch_gesture_states {
-	TAP,
-	LONG_TAP,
-	MOTION_UP,
-	MOTION_DOWN,
-	MOTION_LEFT,
-	MOTION_RIGHT,
-	PINCH_IN,
-	PINCH_OUT,
-
-};
 
 /**
  * represents a single touch point to be stored by sway_cursor 
@@ -50,7 +35,7 @@ struct sway_touch_gesture {
 	int32_t next_touch_id;
 	uint32_t maximum_touch_points;
 	double motion_hysteresis;
-	enum touch_gesture_states gesture_state;
+	enum touch_gesture_types gesture_state;
 };
 
 /**
