@@ -38,6 +38,14 @@ void free_switch_binding(struct sway_switch_binding *binding) {
 	free(binding);
 }
 
+void free_touch_binding(struct sway_touch_binding *binding) {
+	if (!binding) {
+		return;
+	}
+	free(binding->command);
+	free(binding);
+}
+
 /**
  * Returns true if the bindings have the same switch type and state combinations.
  */
@@ -257,6 +265,46 @@ static struct cmd_results *switch_binding_remove(
 	free_switch_binding(binding);
 	return cmd_results_new(CMD_FAILURE, "Could not find switch binding `%s`",
 			switchcombo);
+}
+
+static struct cmd_results *touch_binding_add(
+		struct sway_touch_binding *binding) {
+	list_t *bindings = config->current_mode->touch_bindings;
+	bool overwritten = false;
+	for (int i = 0; i < bindings->length; i++) {
+		struct sway_touch_binding *config_binding = bindings->items[i];
+		if (binding->npoints == config_binding->npoints &&
+				binding->type == config_binding->type) {
+			free_touch_binding(config_binding);
+			bindings->items[i] = binding;
+			overwritten = true;
+		}
+	}
+
+	if (!overwritten) {
+		list_add(bindings, binding);
+	}
+
+	return cmd_results_new(CMD_SUCCESS, NULL);
+}
+
+static struct cmd_results *touch_binding_remove(
+		struct sway_touch_binding *binding) {
+
+	list_t *bindings = config->current_mode->touch_bindings;
+	for (int i = 0; i < bindings->length; i++) {
+		struct sway_touch_binding *config_binding = bindings->items[i];
+		if (binding->npoints == config_binding->npoints &&
+				binding->type == config_binding->type) {
+			free_touch_binding(binding);
+			free_touch_binding(config_binding);
+			list_del(bindings, i);
+			return cmd_results_new(CMD_SUCCESS, NULL);
+		}
+	}
+
+	free_touch_binding(binding);
+	return cmd_results_new(CMD_FAILURE, "Could not find touch binding");
 }
 
 /**
@@ -571,6 +619,66 @@ struct cmd_results *cmd_bind_or_unbind_switch(int argc, char **argv,
 	return switch_binding_add(binding, bindtype, argv[0], warn);
 }
 
+struct cmd_results *
+cmd_bind_or_unbind_touch(int argc, char **argv, bool unbind) {
+
+	list_t *split = split_string(argv[0], "+");
+	if (split->length > 2) {
+		list_free_items_and_destroy(split);
+		return cmd_results_new(
+				CMD_FAILURE, "Gesture format should be <finger_count>+<type>");
+	}
+
+	uint32_t npoints = atoi(split->items[0]);
+	if (npoints < 3) {
+		list_free_items_and_destroy(split);
+		return cmd_results_new(CMD_FAILURE,
+				"Invalid touch points number. "
+				"Composer gestures start at 3 points and up");
+	}
+
+
+	enum touch_gesture_types type;
+	if (strcmp(split->items[1], "tap") == 0) {
+		type = GESTURE_TAP;
+	} else if (strcmp(split->items[1], "long_tap") == 0) {
+		type = GESTURE_LONG_TAP;
+	} else if (strcmp(split->items[1], "swipe_up") == 0) {
+		type = GESTURE_SWIPE_UP;
+	} else if (strcmp(split->items[1], "swipe_down") == 0) {
+		type = GESTURE_SWIPE_DOWN;
+	} else if (strcmp(split->items[1], "swipe_left") == 0) {
+		type = GESTURE_SWIPE_LEFT;
+	} else if (strcmp(split->items[1], "swipe_right") == 0) {
+		type = GESTURE_SWIPE_RIGHT;
+	} else if (strcmp(split->items[1], "pinch_in") == 0) {
+		type = GESTURE_PINCH_IN;
+	} else if (strcmp(split->items[1], "pinch_out") == 0) {
+		type = GESTURE_PINCH_OUT;
+	} else {
+		list_free_items_and_destroy(split);
+		return cmd_results_new(
+				CMD_FAILURE, "Gesture type is not one of the known types");
+	}
+
+	struct sway_touch_binding *binding =
+			calloc(1, sizeof(struct sway_touch_binding));
+	if (!binding) {
+		return cmd_results_new(CMD_FAILURE, "Unable to allocate binding");
+	}
+
+	binding->npoints = npoints;
+	binding->type = type;
+	binding->command = join_args(argv + 1, argc - 1);
+
+	list_free_items_and_destroy(split);
+
+	if (unbind) {
+		return touch_binding_remove(binding);
+	}
+	return touch_binding_add(binding);
+}
+
 struct cmd_results *cmd_bindsym(int argc, char **argv) {
 	return cmd_bindsym_or_bindcode(argc, argv, false, false);
 }
@@ -579,8 +687,16 @@ struct cmd_results *cmd_bindcode(int argc, char **argv) {
 	return cmd_bindsym_or_bindcode(argc, argv, true, false);
 }
 
+struct cmd_results *cmd_bindtouch(int argc, char **argv) {
+	return cmd_bind_or_unbind_touch(argc, argv, false);
+}
+
 struct cmd_results *cmd_unbindsym(int argc, char **argv) {
 	return cmd_bindsym_or_bindcode(argc, argv, false, true);
+}
+
+struct cmd_results *cmd_unbindtouch(int argc, char **argv) {
+	return cmd_bind_or_unbind_touch(argc, argv, true);
 }
 
 struct cmd_results *cmd_unbindcode(int argc, char **argv) {
