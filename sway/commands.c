@@ -49,6 +49,7 @@ static struct cmd_handler handlers[] = {
 	{ "bindcode", cmd_bindcode },
 	{ "bindswitch", cmd_bindswitch },
 	{ "bindsym", cmd_bindsym },
+	{ "bindtouch", cmd_bindtouch },
 	{ "client.background", cmd_client_noop },
 	{ "client.focused", cmd_client_focused },
 	{ "client.focused_inactive", cmd_client_focused_inactive },
@@ -95,6 +96,7 @@ static struct cmd_handler handlers[] = {
 	{ "unbindcode", cmd_unbindcode },
 	{ "unbindswitch", cmd_unbindswitch },
 	{ "unbindsym", cmd_unbindsym },
+	{ "unbindtouch", cmd_unbindtouch },
 	{ "workspace", cmd_workspace },
 	{ "workspace_auto_back_and_forth", cmd_ws_auto_back_and_forth },
 };

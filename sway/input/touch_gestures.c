@@ -107,59 +107,22 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 
 	struct sway_binding *binding = calloc(1, sizeof(struct sway_binding));
 	binding->type = BINDING_TOUCH;
-	bool is_assigned_cmd = false;
+	//bool is_assigned_cmd = false;
 
 	uint32_t npoints = wl_list_length(&gesture->touch_points);
 	if (npoints == 0) {
-		switch (gesture->gesture_state) {
-		case GESTURE_TAP:
-			break;
-		case GESTURE_LONG_TAP:
-			switch (gesture->maximum_touch_points) {
-			case 3:
-				binding->command = "exec termite";
-				is_assigned_cmd = true;
-				break;
-			case 4:
-				break;
-			case 5:
-				break;
-			default:
-				break;
-			}
-			break;
-		case GESTURE_SWIPE_UP:
-			break;
-		case GESTURE_SWIPE_DOWN:
-			switch (gesture->maximum_touch_points) {
-			case 3:
-				break;
-			case 4:
-			  binding->command = "kill";
-			  is_assigned_cmd = true;
-				break;
-			case 5:
-				break;
-			default:
-				break;
-			}
 
-			break;
-		case GESTURE_SWIPE_LEFT:
-			break;
-		case GESTURE_SWIPE_RIGHT:
-			break;
-		case GESTURE_PINCH_IN:
-			break;
-		case GESTURE_PINCH_OUT:
-			break;
-		default:
-			break;
+		list_t *mode_bindings = config->current_mode->touch_bindings;
+		for (int i = 0; i < mode_bindings->length; i++) {
+			struct sway_touch_binding *config_binding = mode_bindings->items[i];
+			if (config_binding->npoints == gesture->maximum_touch_points &&
+					config_binding->type == gesture->gesture_state) {
+				binding->command = config_binding->command;
+				seat_execute_command(gesture->seat, binding);
+				break;
+			}
 		}
-		//TODO gesture processing goes here
-		if (is_assigned_cmd) {
-			seat_execute_command(gesture->seat, binding);
-		}
+
 		free(binding);
 		gesture->maximum_touch_points = 0;
 		gesture->gesture_state = GESTURE_TAP;

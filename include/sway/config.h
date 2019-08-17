@@ -93,14 +93,13 @@ enum touch_gesture_types {
 
 };
 
-
 /**
  * A touch binding
  */
 struct sway_touch_binding {
-  uint32_t npoints;
-  enum touch_gesture_types type;
-  char *command;
+	uint32_t npoints;
+	enum touch_gesture_types type;
+	char *command;
 };
 
 /**
@@ -122,6 +121,7 @@ struct sway_mode {
 	list_t *keycode_bindings;
 	list_t *mouse_bindings;
 	list_t *switch_bindings;
+	list_t *touch_bindings;
 	bool pango;
 };
 
@@ -734,6 +734,8 @@ int workspace_output_cmp_workspace(const void *a, const void *b);
 void free_sway_binding(struct sway_binding *sb);
 
 void free_switch_binding(struct sway_switch_binding *binding);
+
+void free_touch_binding(struct sway_touch_binding *binding);
 
 void seat_execute_command(struct sway_seat *seat, struct sway_binding *binding);
 
