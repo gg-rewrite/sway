@@ -78,6 +78,9 @@ bool process_touch_down(struct sway_touch_gesture *gesture,
 		gesture->maximum_touch_points = npoints;
 	}
 
+	printf("touch points in list: %d\n", npoints);
+	printf("touch points maximum: %d\n", gesture->maximum_touch_points);
+
 	if (npoints >= 3) {
 		return false;
 	} else {
@@ -136,7 +139,7 @@ bool process_touch_motion(struct sway_touch_gesture *gesture,
 
 	//not sending touch events if three or more fingers touching
 	bool touch_passthrough =
-			(wl_list_length(&gesture->touch_points) >= 3) ? true : false;
+			(gesture->maximum_touch_points >= 3) ? false : true;
 
 	struct sway_touch_point *point;
 	wl_list_for_each(point, &gesture->touch_points, link) {
