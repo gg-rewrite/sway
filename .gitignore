@@ -11,3 +11,6 @@ config-debug
 wayland-*-protocol.*
 /subprojects/wlroots
 subprojects
+GPATH
+GRTAGS
+GTAGS
