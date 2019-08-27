@@ -451,8 +451,7 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 				event->touch_id,
 				lx,
 				ly,
-				event->time_msec,
-				surface)) {
+				event->time_msec)) {
 		wlr_seat_touch_notify_up(wlr_seat, event->time_msec, event->touch_id);
 		return;
 	}

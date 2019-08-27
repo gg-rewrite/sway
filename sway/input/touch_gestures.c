@@ -28,8 +28,6 @@ void set_touch_motion_hysteresis(struct sway_touch_gesture *gesture,
 		int32_t phys_size,
 		int32_t px_size) {
 	gesture->motion_hysteresis = px_size / phys_size * HYSTERESIS_MM;
-	printf("current motion hysteresis: %f\n",
-	       gesture->motion_hysteresis);
 }
 
 //initializing the touch points list
@@ -49,8 +47,7 @@ bool process_touch_down(struct sway_touch_gesture *gesture,
 		int32_t touch_id,
 		double layout_x,
 		double layout_y,
-		uint32_t time_msec,
-		struct wlr_surface *surface) {
+		uint32_t time_msec) {
 	struct sway_touch_point *touch_point =
 			calloc(1, sizeof(struct sway_touch_point));
 	touch_point->x = layout_x;
@@ -70,9 +67,6 @@ bool process_touch_down(struct sway_touch_gesture *gesture,
 				initial_point->x,
 				touch_point->y,
 				initial_point->y);
-		printf("point %d initial distance %f\n",
-		       touch_point->touch_id,
-		       touch_point->initial_distance);
 	}
 
 	wl_list_insert(&gesture->touch_points, &touch_point->link);
@@ -128,8 +122,6 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 		}
 
 
-		printf("Gesture: %d finger ",
-		       gesture->maximum_touch_points);
 
 		switch(gesture->gesture_state) {
 		case GESTURE_LONG_TAP:
