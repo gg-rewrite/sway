@@ -69,8 +69,7 @@ bool process_touch_down(struct sway_touch_gesture *gesture,
 		int32_t touch_id,
 		double layout_x,
 		double layout_y,
-		uint32_t time_msec,
-		struct wlr_surface *surface);
+		uint32_t time_msec);
 
 /**
  * registers released points, calculates the final gesture to send to processing
