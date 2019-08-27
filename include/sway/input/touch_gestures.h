@@ -32,7 +32,6 @@ struct sway_touch_gesture {
 	struct sway_seat *seat;
 	struct wl_list touch_points;
 	int32_t initial_touch_id;
-	int32_t next_touch_id;
 	uint32_t maximum_touch_points;
 	double motion_hysteresis;
 	enum touch_gesture_types gesture_state;

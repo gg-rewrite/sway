@@ -28,6 +28,8 @@ void set_touch_motion_hysteresis(struct sway_touch_gesture *gesture,
 		int32_t phys_size,
 		int32_t px_size) {
 	gesture->motion_hysteresis = px_size / phys_size * HYSTERESIS_MM;
+	printf("current motion hysteresis: %f\n",
+	       gesture->motion_hysteresis);
 }
 
 //initializing the touch points list
@@ -53,15 +55,14 @@ bool process_touch_down(struct sway_touch_gesture *gesture,
 			calloc(1, sizeof(struct sway_touch_point));
 	touch_point->x = layout_x;
 	touch_point->y = layout_y;
+	touch_point->dx = layout_x;
+	touch_point->dy = layout_y;
 	touch_point->touch_id = touch_id;
 	touch_point->time = time_msec;
 
 	if (gesture->maximum_touch_points == 0) {
 		gesture->initial_touch_id = touch_id;
 		touch_point->initial_distance = 0;
-	} else if (gesture->maximum_touch_points == 1) {
-		//TODO make a less dumb way of just taking a point next to initial one
-		gesture->next_touch_id = touch_id;
 	} else {
 		struct sway_touch_point *initial_point =
 				get_point_by_id(gesture, gesture->initial_touch_id);
@@ -69,6 +70,9 @@ bool process_touch_down(struct sway_touch_gesture *gesture,
 				initial_point->x,
 				touch_point->y,
 				initial_point->y);
+		printf("point %d initial distance %f\n",
+		       touch_point->touch_id,
+		       touch_point->initial_distance);
 	}
 
 	wl_list_insert(&gesture->touch_points, &touch_point->link);
@@ -77,9 +81,6 @@ bool process_touch_down(struct sway_touch_gesture *gesture,
 	if (npoints > gesture->maximum_touch_points) {
 		gesture->maximum_touch_points = npoints;
 	}
-
-	printf("touch points in list: %d\n", npoints);
-	printf("touch points maximum: %d\n", gesture->maximum_touch_points);
 
 	if (npoints >= 3) {
 		return false;
@@ -126,6 +127,40 @@ void process_touch_up(struct sway_touch_gesture *gesture,
 			}
 		}
 
+
+		printf("Gesture: %d finger ",
+		       gesture->maximum_touch_points);
+
+		switch(gesture->gesture_state) {
+		case GESTURE_LONG_TAP:
+		  printf("long tap");
+		  break;
+		case GESTURE_PINCH_IN:
+		  printf("pinch in");
+		  break;
+		case GESTURE_PINCH_OUT:
+		  printf("pinch out");
+		  break;
+		case GESTURE_SWIPE_DOWN:
+		  printf("swipe down");
+		  break;
+		case GESTURE_SWIPE_LEFT:
+		  printf("swipe left");
+		  break;
+		case GESTURE_SWIPE_RIGHT:
+		  printf("swipe right");
+		  break;
+		case GESTURE_SWIPE_UP:
+		  printf("swipe up");
+		  break;
+		case GESTURE_TAP:
+		  printf("tap");
+		  break;
+		default:
+		  break;
+		}
+		printf("\n");
+
 		free(binding);
 		gesture->maximum_touch_points = 0;
 		gesture->gesture_state = GESTURE_TAP;
@@ -136,73 +171,94 @@ bool process_touch_motion(struct sway_touch_gesture *gesture,
 		double layout_x,
 		double layout_y,
 		int32_t touch_id) {
-
+  
 	//not sending touch events if three or more fingers touching
 	bool touch_passthrough =
 			(gesture->maximum_touch_points >= 3) ? false : true;
 
 	struct sway_touch_point *point;
+	bool found = false;
 	wl_list_for_each(point, &gesture->touch_points, link) {
 		if (point->touch_id == touch_id) {
+			found = true;
 			break;
 		}
 	}
 
+	if (!found) {
+		return touch_passthrough;
+	}
+	
 	point->dx = layout_x;
 	point->dy = layout_y;
 
-	if (measure_distance(point->x, layout_x, point->y, layout_y) >=
-			gesture->motion_hysteresis) {
+	/*
+	 * Detecting pinch
+	 */
 
-		//swipe detection
-		double dir_x = layout_x - point->x;
-		double dir_y = layout_y - point->y;
-		double dx = fabs(dir_x);
-		double dy = fabs(dir_y);
-		if (dx > dy) {
-			//horizontal motion
-			if (dir_x < 0) {
-				//left
-				gesture->gesture_state = GESTURE_SWIPE_LEFT;
-			} else {
-				gesture->gesture_state = GESTURE_SWIPE_RIGHT;
-			}
-		} else {
-			//vertical motion
-			if (dir_y < 0) {
-				//up
-				gesture->gesture_state = GESTURE_SWIPE_UP;
-			} else {
-				//down
-				gesture->gesture_state = GESTURE_SWIPE_DOWN;
-			}
+	struct sway_touch_point *initial_point =
+			get_point_by_id(gesture, gesture->initial_touch_id);
+
+	bool is_pinch = false;
+
+	wl_list_for_each(point, &gesture->touch_points, link) {
+		if (point->touch_id == gesture->initial_touch_id) {
+			continue;
 		}
 
-		if (wl_list_length(&gesture->touch_points) >= 2) {
-			struct sway_touch_point *initial_point =
-					get_point_by_id(gesture, gesture->initial_touch_id);
-			struct sway_touch_point *next_point =
-					get_point_by_id(gesture, gesture->next_touch_id);
+		double current_distance = measure_distance(
+				point->dx, initial_point->dx, point->dy, initial_point->dy);
 
-			double initial_d = measure_distance(initial_point->x,
-					next_point->x,
-					initial_point->y,
-					next_point->y); // sounds of eurobeat in the distance
-			double current_d = measure_distance(initial_point->dx,
-					next_point->dx,
-					initial_point->dy,
-					next_point->dy);
+		printf("point %d current distance %f\n",
+		       point->touch_id,
+		       current_distance);
+		
+		if (fabs(current_distance - point->initial_distance) >
+				gesture->motion_hysteresis) {
+			if (current_distance > point->initial_distance) {
+				gesture->gesture_state = GESTURE_PINCH_OUT;
+			} else {
+				gesture->gesture_state = GESTURE_PINCH_IN;
+			}
+			is_pinch = true;
+		} else {
+			is_pinch = false;
+			break;
+		}
+	}
 
-			if (fabs(current_d - initial_d) > gesture->motion_hysteresis) {
-				if (current_d > initial_d) {
-					gesture->gesture_state = GESTURE_PINCH_OUT;
+	// detecting swipe
+	if (!is_pinch) {
+		double swipe_distance = measure_distance(initial_point->x,
+				initial_point->dx,
+				initial_point->y,
+				initial_point->dy);
+		if (swipe_distance > gesture->motion_hysteresis) {
+			double dir_x = initial_point->dx - initial_point->x;
+			double dir_y = initial_point->dy - initial_point->y;
+			double dx = fabs(dir_x);
+			double dy = fabs(dir_y);
+			if (dx > dy) {
+				//horizontal motion
+				if (dir_x < 0) {
+					//left
+					gesture->gesture_state = GESTURE_SWIPE_LEFT;
 				} else {
-					gesture->gesture_state = GESTURE_PINCH_IN;
+					//right
+					gesture->gesture_state = GESTURE_SWIPE_RIGHT;
+				}
+			} else {
+				//vertical motion
+				if (dir_y < 0) {
+					//up
+					gesture->gesture_state = GESTURE_SWIPE_UP;
+				} else {
+					//down
+					gesture->gesture_state = GESTURE_SWIPE_DOWN;
 				}
 			}
 		}
 	}
-
 	return touch_passthrough;
 }
 
