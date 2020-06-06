@@ -31,8 +31,6 @@ struct sway_touch_point {
   double x;
   double y;
   uint32_t time;
-  double dx;
-  double dy;
   double initial_distance;
   double current_distance;
 };

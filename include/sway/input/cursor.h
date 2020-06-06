@@ -52,6 +52,7 @@ struct sway_cursor {
 	struct wl_listener touch_down;
 	struct wl_listener touch_up;
 	struct wl_listener touch_motion;
+
 	bool simulating_pointer_from_touch;
 	int32_t pointer_touch_id;
   //touch points
@@ -68,6 +69,9 @@ struct sway_cursor {
   } touch_gestures;
 
   struct sway_touch_gesture *touch_gesture;
+=======
+	struct sway_touch_gesture *touch_gesture;
+>>>>>>> bbbe38d2... added proper formatting; added directional swipe recognition
 
 	struct wl_listener tool_axis;
 	struct wl_listener tool_tip;

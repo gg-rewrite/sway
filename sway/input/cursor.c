@@ -413,6 +413,7 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 	seat->touch_x = lx;
 	seat->touch_y = ly;
 
+
 	if (surface && wlr_surface_accepts_touch(wlr_seat, surface)) {
 		if (seat_is_input_allowed(seat, surface)) {
 			cursor_hide(cursor);
@@ -440,14 +441,23 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 	if (npoints >= 3) {
 	  //cancelling touch down event if three or more fingers are down
 	  // (to e.g. prevent further scrolling while inputting a motion gesture)
-=======
 	if (!process_touch_down(cursor->touch_gesture, event->touch_id,
 				lx, ly, event->time_msec, surface)) {
->>>>>>> 891ec36d... moved all the gesture logic into a separate TU
 	  wlr_seat_touch_notify_up(wlr_seat, event->time_msec, event->touch_id);
 	  return;
 	  }
 	
+	if (!process_touch_down(cursor->touch_gesture,
+				event->touch_id,
+				lx,
+				ly,
+				event->time_msec,
+				surface)) {
+		wlr_seat_touch_notify_up(wlr_seat, event->time_msec, event->touch_id);
+		return;
+	}
+
+>>>>>>> bbbe38d2... added proper formatting; added directional swipe recognition
 	if (!surface) {
 		return;
 	}
@@ -517,16 +527,16 @@ static void handle_touch_motion(struct wl_listener *listener, void *data) {
 
 	//TODO check if can be done in cursor_create
 	if (is_touch_motion_hysteresis_unset(cursor->touch_gesture)) {
-	  struct wlr_output *output =
-	    wlr_output_layout_output_at(root->output_layout, lx, ly);
-	  //roughly 1cm
-	  set_touch_motion_hysteresis(cursor->touch_gesture, output->phys_width,
-				      output->width);
-	  }
-	if (!process_touch_motion(cursor->touch_gesture, lx, ly, event->touch_id)) {
-	  return;
+		struct wlr_output *output =
+				wlr_output_layout_output_at(root->output_layout, lx, ly);
+		//roughly 1cm
+		set_touch_motion_hysteresis(
+				cursor->touch_gesture, output->phys_width, output->width);
 	}
-	
+	if (!process_touch_motion(cursor->touch_gesture, lx, ly, event->touch_id)) {
+		return;
+	}
+
 	if (seat->touch_id == event->touch_id) {
 		seat->touch_x = lx;
 		seat->touch_y = ly;
@@ -1025,7 +1035,7 @@ void sway_cursor_destroy(struct sway_cursor *cursor) {
 		return;
 	}
 
-	
+	touch_gesture_destroy(cursor->touch_gesture);
 	
 	wl_event_source_remove(cursor->hide_source);
 
