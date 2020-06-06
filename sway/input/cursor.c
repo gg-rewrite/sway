@@ -456,7 +456,6 @@ static void handle_touch_down(struct wl_listener *listener, void *data) {
 		return;
 	}
 
->>>>>>> bbbe38d2... added proper formatting; added directional swipe recognition
 	if (!surface) {
 		return;
 	}
