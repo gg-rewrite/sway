@@ -1,0 +1,13 @@
+#!/bin/bash
+# Finds all the containers with the split layout and toggles splitv/splith. Useful during screen rotation
+# Dependencies:
+#	* jq
+
+numbers_raw=$(swaymsg -t get_tree| jq -c '[.nodes[1].nodes[] | select(.layout == "splith" or .layout == "splitv") | .nodes[0].id]' | tr -d [\[\]])
+
+IFS=',' read -r -a numbers <<< "$numbers_raw"
+
+for con_id in ${numbers[*]}
+do 
+	swaymsg [con_id="$con_id"] layout toggle split
+done
